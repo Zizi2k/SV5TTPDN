@@ -38,7 +38,7 @@ function handleRequest(e, method) {
 }
 
 function routeAction(action, payload) {
-  const publicActions = ['login', 'register', 'getMembers', 'getMember', 'getActivities', 'getActivity', 'getAnnouncements', 'getExecutiveBoard'];
+  const publicActions = ['login', 'register', 'logout', 'getSettings', 'getMembers', 'getMember', 'getActivities', 'getActivity', 'getAnnouncements', 'getExecutiveBoard'];
 
   if (!publicActions.includes(action)) {
     const user = validateToken(payload.token);

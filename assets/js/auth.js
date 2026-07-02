@@ -3,6 +3,7 @@
  */
 const Auth = {
   STORAGE_KEY: 'sv5t_session',
+  _loggingOut: false,
 
   getSession() {
     try {
@@ -42,12 +43,34 @@ const Auth = {
   },
 
   logout() {
-    API.logout().catch(() => {});
+    if (this._loggingOut) return;
+    this._loggingOut = true;
+    const token = this.getToken();
+    this._clearSession();
+    if (token) {
+      API.request('logout', { token }, { silent: true, skipAuthHandler: true }).catch(() => {});
+    }
+    Utils.showToast('Đã đăng xuất', 'info');
+    Router.go('home');
+    this._loggingOut = false;
+  },
+
+  handleUnauthorized(message) {
+    if (this._loggingOut) return;
+    this._loggingOut = true;
+    const wasLoggedIn = !!localStorage.getItem(this.STORAGE_KEY);
+    this._clearSession();
+    if (wasLoggedIn) {
+      Utils.showToast(message || 'Phiên đăng nhập đã hết hạn', 'warning');
+    }
+    Router.go('home');
+    this._loggingOut = false;
+  },
+
+  _clearSession() {
     localStorage.removeItem(this.STORAGE_KEY);
     AppStore.clear();
     this.updateNavbar();
-    Router.go('home');
-    Utils.showToast('Đã đăng xuất', 'info');
   },
 
   updateNavbar() {

@@ -12,7 +12,7 @@ const API = {
   },
 
   async request(action, data = {}, options = {}) {
-    const { method, silent = false, useCache = true } = options;
+    const { method, silent = false, useCache = true, skipAuthHandler = false } = options;
 
     if (this.isDemoMode()) {
       console.warn('API_URL chưa được cấu hình. Sử dụng dữ liệu demo.');
@@ -64,7 +64,9 @@ const API = {
         throw new Error('Không thể kết nối API. Kiểm tra URL Google Apps Script và quyền truy cập.');
       }
       if (!result.success) {
-        if (result.code === 'UNAUTHORIZED') Auth.logout();
+        if (result.code === 'UNAUTHORIZED' && !skipAuthHandler && action !== 'logout') {
+          Auth.handleUnauthorized(result.message);
+        }
         throw new Error(result.message || 'Lỗi không xác định');
       }
 
@@ -75,7 +77,7 @@ const API = {
 
       return result.data;
     } catch (err) {
-      Utils.showToast(err.message, 'danger');
+      if (!silent && !Auth._loggingOut) Utils.showToast(err.message, 'danger');
       throw err;
     } finally {
       if (!silent) Utils.showLoading(false);
