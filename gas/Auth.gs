@@ -175,6 +175,28 @@ function updateProfile(user, payload) {
   return { message: 'Cập nhật thành công' };
 }
 
+function changePassword(user, payload) {
+  const { currentPassword, newPassword } = payload;
+  if (!currentPassword || !newPassword) {
+    throw new Error('Vui lòng nhập đầy đủ thông tin');
+  }
+  if (String(newPassword).length < 6) {
+    throw new Error('Mật khẩu mới phải có ít nhất 6 ký tự');
+  }
+
+  const users = getSheetData(SHEET_NAMES.USERS);
+  const account = users.find(u => u.id === user.id);
+  if (!account) throw new Error('Không tìm thấy tài khoản');
+
+  if (account.password !== hashPassword(currentPassword)) {
+    throw new Error('Mật khẩu hiện tại không đúng');
+  }
+
+  updateRow(SHEET_NAMES.USERS, user.id, { password: hashPassword(newPassword) });
+  logAudit('CHANGE_PASSWORD', user.id, null);
+  return { message: 'Đã đổi mật khẩu thành công' };
+}
+
 function approveMember(id, approver) {
   const users = getSheetData(SHEET_NAMES.USERS);
   const user = users.find(u => u.memberId === id || u.id === id);

@@ -25,13 +25,36 @@ Pages.myProfile = async function(container) {
             </div>
             <div class="row g-3" id="profileInfo">
               <div class="col-md-6"><strong>Email:</strong> ${Utils.escapeHtml(member.email || '')}</div>
-              <div class="col-md-6"><strong>Điện thoại:</strong> ${Utils.escapeHtml(member.phone || '')}</div>
-              <div class="col-md-6"><strong>Trường:</strong> ${Utils.escapeHtml(member.school || '')}</div>
-              <div class="col-md-6"><strong>Khoa:</strong> ${Utils.escapeHtml(member.faculty || '')}</div>
-              <div class="col-md-6"><strong>Ngày sinh:</strong> ${Utils.formatDate(member.birthday)}</div>
-              <div class="col-md-6"><strong>Tham gia:</strong> ${Utils.formatDate(member.joinDate)}</div>
+              <div class="col-md-6"><strong>Điện thoại:</strong> ${Utils.escapeHtml(member.phone || '—')}</div>
+              <div class="col-md-6"><strong>Trường:</strong> ${Utils.escapeHtml(member.school || '—')}</div>
+              <div class="col-md-6"><strong>Khoa:</strong> ${Utils.escapeHtml(member.faculty || '—')}</div>
+              <div class="col-md-6"><strong>Ngày sinh:</strong> ${Utils.formatDate(member.birthday) || '—'}</div>
+              <div class="col-md-6"><strong>Tham gia:</strong> ${Utils.formatDate(member.joinDate) || '—'}</div>
+              <div class="col-md-6"><strong>Facebook:</strong> ${member.facebook ? `<a href="${Utils.escapeHtml(member.facebook)}" target="_blank">Liên kết</a>` : '—'}</div>
+              <div class="col-md-6"><strong>Zalo:</strong> ${Utils.escapeHtml(member.zalo || '—')}</div>
+              <div class="col-12"><strong>Địa chỉ:</strong> ${Utils.escapeHtml(member.address || '—')}</div>
             </div>
           </div>
+
+          <div class="profile-section">
+            <h5><i class="bi bi-chat-quote me-2"></i>Giới thiệu</h5>
+            <p class="mb-2">${Utils.escapeHtml(member.bio || 'Chưa cập nhật')}</p>
+            ${member.quote ? `<blockquote class="blockquote border-start border-warning border-4 ps-3 mb-0"><p class="mb-0 fst-italic small">"${Utils.escapeHtml(member.quote)}"</p></blockquote>` : ''}
+          </div>
+
+          ${member.hobbies ? `
+            <div class="profile-section">
+              <h5><i class="bi bi-heart me-2"></i>Sở thích</h5>
+              <div>${Utils.tagsToHtml(Utils.parseTags(member.hobbies), 'tag tag-hobby')}</div>
+            </div>
+          ` : ''}
+
+          ${member.skills ? `
+            <div class="profile-section">
+              <h5><i class="bi bi-tools me-2"></i>Kỹ năng</h5>
+              <div>${Utils.tagsToHtml(Utils.parseTags(member.skills), 'tag tag-skill')}</div>
+            </div>
+          ` : ''}
 
           <div class="profile-section">
             <h5><i class="bi bi-trophy me-2"></i>Điểm hoạt động</h5>
@@ -41,13 +64,13 @@ Pages.myProfile = async function(container) {
                   <tr><th>Hoạt động</th><th>Ngày</th><th class="text-end">Điểm</th></tr>
                 </thead>
                 <tbody>
-                  ${(scores.items || []).map(s => `
+                  ${(scores.items || []).length ? (scores.items || []).map(s => `
                     <tr>
                       <td>${Utils.escapeHtml(s.activity)}</td>
                       <td>${Utils.formatDate(s.date)}</td>
                       <td class="text-end fw-semibold">${s.score}</td>
                     </tr>
-                  `).join('')}
+                  `).join('') : '<tr><td colspan="3" class="text-center text-muted">Chưa có điểm</td></tr>'}
                 </tbody>
                 <tfoot>
                   <tr class="score-total">
@@ -86,11 +109,147 @@ Pages.myProfile = async function(container) {
     </div>
   `;
 
-  document.getElementById('btnEditProfile')?.addEventListener('click', () => {
-    Utils.showToast('Tính năng chỉnh sửa hồ sơ sẽ được cập nhật', 'info');
+  ensureProfileModals();
+
+  document.getElementById('btnEditProfile')?.addEventListener('click', () => openEditProfileModal(member));
+  document.getElementById('btnChangePassword')?.addEventListener('click', () => {
+    new bootstrap.Modal(document.getElementById('changePasswordModal')).show();
   });
 
-  document.getElementById('btnChangePassword')?.addEventListener('click', () => {
-    Utils.showToast('Tính năng đổi mật khẩu sẽ được cập nhật', 'info');
+  document.getElementById('editProfileForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const data = Object.fromEntries(new FormData(form));
+    try {
+      await API.updateProfile(data);
+      Utils.showToast('Đã cập nhật hồ sơ', 'success');
+      bootstrap.Modal.getInstance(document.getElementById('editProfileModal'))?.hide();
+      Pages.myProfile(container);
+    } catch (err) { /* handled */ }
+  });
+
+  document.getElementById('changePasswordForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const currentPassword = form.currentPassword.value;
+    const newPassword = form.newPassword.value;
+    const confirmPassword = form.confirmPassword.value;
+
+    if (newPassword !== confirmPassword) {
+      Utils.showToast('Mật khẩu xác nhận không khớp', 'danger');
+      return;
+    }
+    if (newPassword.length < 6) {
+      Utils.showToast('Mật khẩu mới phải có ít nhất 6 ký tự', 'danger');
+      return;
+    }
+
+    try {
+      await API.changePassword({ currentPassword, newPassword });
+      Utils.showToast('Đã đổi mật khẩu thành công', 'success');
+      bootstrap.Modal.getInstance(document.getElementById('changePasswordModal'))?.hide();
+      form.reset();
+    } catch (err) { /* handled */ }
   });
 };
+
+function ensureProfileModals() {
+  if (document.getElementById('editProfileModal')) return;
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal fade" id="editProfileModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <form id="editProfileForm">
+            <div class="modal-header">
+              <h5 class="modal-title">Chỉnh sửa hồ sơ</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Số điện thoại</label>
+                  <input type="tel" class="form-control" name="phone">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Địa chỉ</label>
+                  <input type="text" class="form-control" name="address">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Facebook</label>
+                  <input type="url" class="form-control" name="facebook" placeholder="https://facebook.com/...">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Zalo</label>
+                  <input type="text" class="form-control" name="zalo">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Sở thích</label>
+                  <input type="text" class="form-control" name="hobbies" placeholder="VD: Đọc sách, Bóng đá (phân cách bằng dấu phẩy)">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Kỹ năng</label>
+                  <input type="text" class="form-control" name="skills" placeholder="VD: MC, Thiết kế, Lập trình">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Câu nói yêu thích</label>
+                  <input type="text" class="form-control" name="quote">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Giới thiệu bản thân</label>
+                  <textarea class="form-control" name="bio" rows="3"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+              <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="changePasswordModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form id="changePasswordForm">
+            <div class="modal-header">
+              <h5 class="modal-title">Đổi mật khẩu</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Mật khẩu hiện tại</label>
+                <input type="password" class="form-control" name="currentPassword" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Mật khẩu mới</label>
+                <input type="password" class="form-control" name="newPassword" required minlength="6">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Xác nhận mật khẩu mới</label>
+                <input type="password" class="form-control" name="confirmPassword" required minlength="6">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+              <button type="submit" class="btn btn-primary">Đổi mật khẩu</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function openEditProfileModal(member) {
+  const form = document.getElementById('editProfileForm');
+  if (!form) return;
+  form.reset();
+  ['phone', 'address', 'facebook', 'zalo', 'hobbies', 'skills', 'quote', 'bio'].forEach(field => {
+    const el = form.elements[field];
+    if (el) el.value = member[field] || '';
+  });
+  new bootstrap.Modal(document.getElementById('editProfileModal')).show();
+}

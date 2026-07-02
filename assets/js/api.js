@@ -74,6 +74,7 @@ const API = {
   logout: () => API.request('logout'),
   getProfile: () => API.request('getProfile'),
   updateProfile: (data) => API.request('updateProfile', data),
+  changePassword: (data) => API.request('changePassword', data),
 
   // Members
   getMembers: (filters = {}) => API.request('getMembers', filters),
@@ -410,6 +411,10 @@ const DemoData = {
   addScore() { return { message: 'Đã cộng điểm', total: 0 }; },
 
   checkIn() { return { message: 'Điểm danh thành công' }; },
+
+  updateProfile(data) { return { message: 'Cập nhật thành công' }; },
+
+  changePassword() { return { message: 'Đã đổi mật khẩu thành công' }; },
 
   register() {
     return { message: 'Đăng ký thành công! Vui lòng chờ Ban Chủ nhiệm phê duyệt.' };

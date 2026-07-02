@@ -63,6 +63,7 @@ function routeAction(action, payload) {
     resetPassword: () => requireRole(payload._user, ['admin']) || resetPassword(payload.id),
     getPendingMembers: () => requireRole(payload._user, ['admin', 'executive']) || getPendingMembers(),
     updateProfile: () => updateProfile(payload._user, payload),
+    changePassword: () => changePassword(payload._user, payload),
 
     // Activities
     getActivities: () => getActivities(payload),
