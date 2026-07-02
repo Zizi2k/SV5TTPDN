@@ -1,10 +1,16 @@
 Pages.myProfile = async function(container) {
   const user = Auth.getUser();
   const memberId = user.memberId || user.id;
-  const [member, scores] = await Promise.all([
+  const fetchers = [
     API.getMember(memberId),
     API.getScores(memberId)
-  ]);
+  ];
+  if (user.role === 'admin') fetchers.push(API.getSettings());
+  const results = await Promise.all(fetchers);
+  const member = results[0];
+  const scores = results[1];
+  const settings = user.role === 'admin' ? (results[2] || {}) : {};
+  const clubLogoUrl = settings.club_logo || Utils.DEFAULT_CLUB_LOGO;
 
   container.innerHTML = `
     <div class="profile-header">
@@ -15,6 +21,9 @@ Pages.myProfile = async function(container) {
             <i class="bi bi-camera-fill"></i>
           </button>
         </div>
+        <button type="button" class="btn btn-sm btn-warning avatar-change-label mb-3" id="btnChangeAvatarLabel">
+          <i class="bi bi-camera-fill me-1"></i>Đổi ảnh đại diện
+        </button>
         <h2 class="mb-1">${Utils.escapeHtml(member.name)}</h2>
         <p class="lead mb-0">${Utils.escapeHtml(member.role)}</p>
       </div>
@@ -109,6 +118,17 @@ Pages.myProfile = async function(container) {
               <i class="bi bi-key me-1"></i>Đổi mật khẩu
             </button>
           </div>
+
+          ${user.role === 'admin' ? `
+          <div class="profile-section text-center">
+            <h5><i class="bi bi-building me-2"></i>Logo CLB</h5>
+            <img src="${Utils.escapeHtml(clubLogoUrl)}" alt="Logo CLB" class="club-logo-preview mb-3" id="profileClubLogoPreview">
+            <button class="btn btn-primary btn-sm w-100" id="btnChangeClubLogoProfile">
+              <i class="bi bi-image me-1"></i>Đổi logo CLB
+            </button>
+            <p class="text-muted small mt-2 mb-0">Hiển thị trên menu, chân trang và trang đăng nhập</p>
+          </div>
+          ` : ''}
         </div>
       </div>
     </div>
@@ -116,13 +136,25 @@ Pages.myProfile = async function(container) {
 
   ensureProfileModals();
 
-  document.getElementById('btnEditProfile')?.addEventListener('click', () => openEditProfileModal(member));
-  document.getElementById('btnChangeAvatar')?.addEventListener('click', async () => {
+  async function handleAvatarChange() {
     try {
       await Utils.uploadMemberAvatar(memberId, (result) => {
         const img = document.getElementById('profileAvatarImg');
         if (img) img.src = Utils.avatarUrl(result.url, member.name);
         Utils.showToast('Đã cập nhật ảnh đại diện', 'success');
+      });
+    } catch (err) { /* handled */ }
+  }
+
+  document.getElementById('btnEditProfile')?.addEventListener('click', () => openEditProfileModal(member));
+  document.getElementById('btnChangeAvatar')?.addEventListener('click', handleAvatarChange);
+  document.getElementById('btnChangeAvatarLabel')?.addEventListener('click', handleAvatarChange);
+  document.getElementById('btnChangeClubLogoProfile')?.addEventListener('click', async () => {
+    try {
+      await Utils.uploadClubLogoFile((result) => {
+        const preview = document.getElementById('profileClubLogoPreview');
+        if (preview) preview.src = result.url;
+        Utils.showToast('Đã cập nhật logo CLB', 'success');
       });
     } catch (err) { /* handled */ }
   });
