@@ -126,14 +126,14 @@ async function renderAdminAudit() {
 async function renderAdminSettings() {
   let settings = {};
   try { settings = await API.getSettings(); } catch { settings = {}; }
-  const logoUrl = settings.club_logo || Utils.DEFAULT_CLUB_LOGO;
+  const logoUrl = Utils.clubLogoUrl(settings.club_logo);
   return `
     <div class="card">
       <div class="card-header bg-white"><h5 class="mb-0">Cài đặt CLB</h5></div>
       <div class="card-body">
         <div class="row g-4 align-items-center">
           <div class="col-md-4 text-center">
-            <img src="${Utils.escapeHtml(logoUrl)}" alt="Logo CLB" class="club-logo-preview" id="adminClubLogoPreview">
+            <img src="${logoUrl}" alt="Logo CLB" class="club-logo-preview" id="adminClubLogoPreview">
           </div>
           <div class="col-md-8">
             <h6>Logo CLB</h6>
@@ -154,11 +154,15 @@ async function renderAdminSettings() {
 }
 
 function bindAdminSettings() {
+  Utils.bindImageFallback(document.getElementById('adminClubLogoPreview'));
   document.getElementById('btnChangeClubLogo')?.addEventListener('click', async () => {
     try {
       await Utils.uploadClubLogoFile((result) => {
         const preview = document.getElementById('adminClubLogoPreview');
-        if (preview) preview.src = result.url;
+        if (preview) {
+          preview.src = Utils.clubLogoUrl(result.url);
+          Utils.bindImageFallback(preview);
+        }
         Utils.showToast('Đã cập nhật logo CLB', 'success');
       });
     } catch (err) { /* handled */ }

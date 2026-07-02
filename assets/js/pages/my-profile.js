@@ -10,7 +10,7 @@ Pages.myProfile = async function(container) {
   const member = results[0];
   const scores = results[1];
   const settings = user.role === 'admin' ? (results[2] || {}) : {};
-  const clubLogoUrl = settings.club_logo || Utils.DEFAULT_CLUB_LOGO;
+  const clubLogoUrl = Utils.clubLogoUrl(settings.club_logo);
 
   container.innerHTML = `
     <div class="profile-header">
@@ -122,7 +122,7 @@ Pages.myProfile = async function(container) {
           ${user.role === 'admin' ? `
           <div class="profile-section text-center">
             <h5><i class="bi bi-building me-2"></i>Logo CLB</h5>
-            <img src="${Utils.escapeHtml(clubLogoUrl)}" alt="Logo CLB" class="club-logo-preview mb-3" id="profileClubLogoPreview">
+            <img src="${clubLogoUrl}" alt="Logo CLB" class="club-logo-preview mb-3" id="profileClubLogoPreview">
             <button class="btn btn-primary btn-sm w-100" id="btnChangeClubLogoProfile">
               <i class="bi bi-image me-1"></i>Đổi logo CLB
             </button>
@@ -153,11 +153,16 @@ Pages.myProfile = async function(container) {
     try {
       await Utils.uploadClubLogoFile((result) => {
         const preview = document.getElementById('profileClubLogoPreview');
-        if (preview) preview.src = result.url;
+        if (preview) {
+          preview.src = Utils.clubLogoUrl(result.url);
+          Utils.bindImageFallback(preview);
+        }
         Utils.showToast('Đã cập nhật logo CLB', 'success');
       });
     } catch (err) { /* handled */ }
   });
+  Utils.bindImageFallback(document.getElementById('profileClubLogoPreview'));
+  Utils.bindImageFallback(document.getElementById('profileAvatarImg'));
   document.getElementById('btnChangePassword')?.addEventListener('click', () => {
     new bootstrap.Modal(document.getElementById('changePasswordModal')).show();
   });

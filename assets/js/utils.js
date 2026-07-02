@@ -112,28 +112,78 @@ const Utils = {
   },
 
   avatarUrl(url, name) {
-    return url || this.defaultAvatar(name);
+    return this.normalizeImageUrl(url) || this.defaultAvatar(name);
   },
 
   DEFAULT_CLUB_LOGO: 'assets/img/logo.svg',
 
-  applyClubLogos(url) {
-    const src = url || this.DEFAULT_CLUB_LOGO;
-    document.querySelectorAll('.club-logo').forEach(img => { img.src = src; });
-    const favicon = document.querySelector('link[rel="icon"]');
-    if (favicon && url) favicon.href = url;
-    if (url) {
-      try { localStorage.setItem('club_logo', url); } catch { /* ignore */ }
+  extractDriveFileId(value) {
+    if (!value) return '';
+    const str = String(value);
+    if (!str.includes('http') && !str.includes('/')) return str;
+    const match = str.match(/[-\w]{25,}/);
+    return match ? match[0] : '';
+  },
+
+  resolveAsset(path) {
+    try {
+      return new URL(path, document.baseURI).href;
+    } catch {
+      return path;
     }
   },
 
+  normalizeImageUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+
+    const driveId = this.extractDriveFileId(trimmed);
+    if (driveId) {
+      return `https://drive.google.com/thumbnail?id=${driveId}&sz=w400`;
+    }
+
+    if (/^(https?:|data:)/i.test(trimmed)) return trimmed;
+    return this.resolveAsset(trimmed);
+  },
+
+  clubLogoUrl(url) {
+    return this.normalizeImageUrl(url) || this.resolveAsset(this.DEFAULT_CLUB_LOGO);
+  },
+
+  bindImageFallback(img, fallbackUrl) {
+    if (!img) return;
+    const fallback = fallbackUrl || this.resolveAsset(this.DEFAULT_CLUB_LOGO);
+    img.addEventListener('error', () => {
+      if (img.dataset.fallbackApplied) return;
+      img.dataset.fallbackApplied = '1';
+      img.src = fallback;
+    }, { once: true });
+  },
+
+  applyClubLogos(url) {
+    const src = this.clubLogoUrl(url);
+    document.querySelectorAll('.club-logo').forEach(img => {
+      img.src = src;
+      this.bindImageFallback(img);
+    });
+    const favicon = document.querySelector('link[rel="icon"]');
+    if (favicon && url) favicon.href = src;
+    try {
+      if (url && url.trim()) localStorage.setItem('club_logo', url.trim());
+      else localStorage.removeItem('club_logo');
+    } catch { /* ignore */ }
+  },
+
   async loadClubBranding() {
-    const cached = localStorage.getItem('club_logo');
-    if (cached) this.applyClubLogos(cached);
     try {
       const settings = await API.getSettings();
-      if (settings?.club_logo) this.applyClubLogos(settings.club_logo);
-    } catch { /* ignore */ }
+      const url = (settings?.club_logo || '').trim();
+      this.applyClubLogos(url);
+    } catch {
+      const cached = (localStorage.getItem('club_logo') || '').trim();
+      this.applyClubLogos(cached);
+    }
   },
 
   fileToBase64(file) {
