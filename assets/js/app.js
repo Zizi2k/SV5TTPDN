@@ -2,6 +2,11 @@
  * Khởi tạo ứng dụng
  */
 document.addEventListener('DOMContentLoaded', () => {
+  const verEl = document.getElementById('appVersion');
+  if (verEl && CONFIG.APP_VERSION) {
+    verEl.textContent = `v${CONFIG.APP_VERSION}`;
+  }
+
   Auth.updateNavbar();
 
   Router.register('home', Pages.home);

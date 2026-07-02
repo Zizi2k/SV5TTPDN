@@ -22,7 +22,7 @@ const MemberCRUD = {
     `).join('') : `<tr><td colspan="6" class="text-center text-muted py-4">Chưa có thành viên</td></tr>`;
 
     return `
-      <div class="card">
+      <div class="card" data-member-crud>
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
           <h5 class="mb-0">Quản lý thành viên (${members.length})</h5>
           <div>
@@ -129,41 +129,67 @@ const MemberCRUD = {
   bindEvents(container, reloadFn) {
     this.ensureModal();
     this._reloadFn = reloadFn;
+    this._activeContainer = container;
+    this.initDelegation();
+  },
 
-    container.querySelector('#btnAddMember')?.addEventListener('click', () => this.openAdd());
-    container.querySelector('#exportAllMembers')?.addEventListener('click', async () => {
-      const members = await API.getMembers();
-      Utils.exportToCSV(members, 'thanh-vien-sv5t.csv');
-      Utils.showToast('Đã xuất file', 'success');
-    });
+  initDelegation() {
+    if (this._delegationReady) return;
+    this._delegationReady = true;
 
-    container.querySelectorAll('.btn-edit-member').forEach(btn => {
-      btn.addEventListener('click', () => this.openEdit(btn.dataset.id));
-    });
+    document.addEventListener('click', async (e) => {
+      const panel = e.target.closest('[data-member-crud]');
+      if (!panel) return;
 
-    container.querySelectorAll('.btn-reset-pw').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      if (e.target.closest('#btnAddMember')) {
+        e.preventDefault();
+        this.openAdd();
+        return;
+      }
+
+      if (e.target.closest('#exportAllMembers')) {
+        e.preventDefault();
+        const members = await API.getMembers();
+        Utils.exportToCSV(members, 'thanh-vien-sv5t.csv');
+        Utils.showToast('Đã xuất file', 'success');
+        return;
+      }
+
+      const editBtn = e.target.closest('.btn-edit-member');
+      if (editBtn) {
+        e.preventDefault();
+        this.openEdit(editBtn.dataset.id);
+        return;
+      }
+
+      const resetBtn = e.target.closest('.btn-reset-pw');
+      if (resetBtn) {
+        e.preventDefault();
         if (!confirm('Reset mật khẩu thành viên này?')) return;
         try {
-          await API.resetPassword(btn.dataset.id);
+          await API.resetPassword(resetBtn.dataset.id);
           Utils.showToast('Đã reset mật khẩu', 'success');
         } catch (err) { /* handled */ }
-      });
-    });
+        return;
+      }
 
-    container.querySelectorAll('.btn-lock-member').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      const lockBtn = e.target.closest('.btn-lock-member');
+      if (lockBtn) {
+        e.preventDefault();
         if (!confirm('Khóa tài khoản thành viên này?')) return;
         try {
-          await API.lockMember(btn.dataset.id);
+          await API.lockMember(lockBtn.dataset.id);
           Utils.showToast('Đã khóa tài khoản', 'warning');
           if (this._reloadFn) await this._reloadFn();
         } catch (err) { /* handled */ }
-      });
-    });
+        return;
+      }
 
-    container.querySelectorAll('.btn-delete-member').forEach(btn => {
-      btn.addEventListener('click', () => this.handleDelete(btn.dataset.id));
+      const deleteBtn = e.target.closest('.btn-delete-member');
+      if (deleteBtn) {
+        e.preventDefault();
+        this.handleDelete(deleteBtn.dataset.id);
+      }
     });
   },
 

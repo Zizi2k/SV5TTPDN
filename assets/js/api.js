@@ -2,8 +2,17 @@
  * API client - giao tiếp với Google Apps Script
  */
 const API = {
-  async request(action, data = {}, method = 'POST') {
-    if (CONFIG.API_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+  GET_ACTIONS: new Set([
+    'getMembers', 'getMember', 'getActivities', 'getActivity',
+    'getAnnouncements', 'getExecutiveBoard', 'getSettings'
+  ]),
+
+  isDemoMode() {
+    return !CONFIG.API_URL || CONFIG.API_URL.includes('YOUR_GOOGLE_APPS_SCRIPT');
+  },
+
+  async request(action, data = {}, method) {
+    if (this.isDemoMode()) {
       console.warn('API_URL chưa được cấu hình. Sử dụng dữ liệu demo.');
       return this._demoResponse(action, data);
     }
@@ -11,16 +20,30 @@ const API = {
     Utils.showLoading(true);
     try {
       const token = Auth.getToken();
-      const payload = { action, ...data, token };
+      const payload = { action, ...data };
+      if (token) payload.token = token;
 
+      const useGet = method === 'GET' || this.GET_ACTIONS.has(action);
       let response;
-      if (method === 'GET') {
-        const params = new URLSearchParams(payload);
-        response = await fetch(`${CONFIG.API_URL}?${params}`, { method: 'GET' });
+
+      if (useGet) {
+        const params = new URLSearchParams();
+        Object.entries(payload).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            params.append(key, String(value));
+          }
+        });
+        response = await fetch(`${CONFIG.API_URL}?${params}`, {
+          method: 'GET',
+          redirect: 'follow',
+          cache: 'no-store'
+        });
       } else {
         response = await fetch(CONFIG.API_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
+          redirect: 'follow',
+          cache: 'no-store',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
       }

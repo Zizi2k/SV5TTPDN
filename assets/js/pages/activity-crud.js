@@ -27,7 +27,7 @@ const ActivityCRUD = {
     }).join('') : `<tr><td colspan="6" class="text-center text-muted py-4">Chưa có hoạt động nào</td></tr>`;
 
     return `
-      <div class="card activity-crud-panel">
+      <div class="card activity-crud-panel" data-activity-crud>
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
           <h5 class="mb-0">Quản lý hoạt động (${activities.length})</h5>
           <button class="btn btn-sm btn-primary" id="btnAddActivity">
@@ -114,15 +114,35 @@ const ActivityCRUD = {
   bindEvents(container, reloadFn) {
     this.ensureModal();
     this._reloadFn = reloadFn;
+    this.initDelegation();
+  },
 
-    container.querySelector('#btnAddActivity')?.addEventListener('click', () => this.openAdd());
+  initDelegation() {
+    if (this._delegationReady) return;
+    this._delegationReady = true;
 
-    container.querySelectorAll('.btn-edit-activity').forEach(btn => {
-      btn.addEventListener('click', () => this.openEdit(btn.dataset.id));
-    });
+    document.addEventListener('click', (e) => {
+      const panel = e.target.closest('[data-activity-crud]');
+      if (!panel) return;
 
-    container.querySelectorAll('.btn-delete-activity').forEach(btn => {
-      btn.addEventListener('click', () => this.handleDelete(btn.dataset.id));
+      if (e.target.closest('#btnAddActivity')) {
+        e.preventDefault();
+        this.openAdd();
+        return;
+      }
+
+      const editBtn = e.target.closest('.btn-edit-activity');
+      if (editBtn) {
+        e.preventDefault();
+        this.openEdit(editBtn.dataset.id);
+        return;
+      }
+
+      const deleteBtn = e.target.closest('.btn-delete-activity');
+      if (deleteBtn) {
+        e.preventDefault();
+        this.handleDelete(deleteBtn.dataset.id);
+      }
     });
   },
 
