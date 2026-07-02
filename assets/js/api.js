@@ -101,6 +101,21 @@ const API = {
 };
 
 const DemoData = {
+  _activities: null,
+
+  _getActivitiesStore() {
+    if (!this._activities) {
+      const today = new Date();
+      const d = (offset) => { const x = new Date(today); x.setDate(x.getDate() + offset); return x.toISOString().split('T')[0]; };
+      this._activities = [
+        { id: 'A001', name: 'Mùa hè xanh', description: 'Chương trình tình nguyện mùa hè', startDate: d(-3), endDate: d(5), location: 'Huyện Cẩm Mỹ', image: '', participants: 25, status: 'ongoing', report: '' },
+        { id: 'A002', name: 'Hiến máu nhân đạo', description: 'Ngày hội hiến máu tình nguyện', startDate: d(3), endDate: d(3), location: 'Trường ĐH Công nghệ', image: '', participants: 40, status: 'upcoming', report: '' },
+        { id: 'A003', name: 'Xuân tình nguyện 2025', description: 'Chương trình xuân tình nguyện', startDate: d(-30), endDate: d(-20), location: 'Toàn tỉnh', image: '', participants: 50, status: 'completed', report: 'Chương trình thành công với 50 thành viên tham gia.' }
+      ];
+    }
+    return this._activities;
+  },
+
   login({ identifier, password }) {
     if (identifier === 'admin' && password === 'admin123') {
       return { token: 'demo-token', user: { id: '1', name: 'Admin', role: 'admin', email: 'admin@sv5t.vn' } };
@@ -142,13 +157,57 @@ const DemoData = {
   },
 
   getActivities() {
-    const today = new Date();
-    const d = (offset) => { const x = new Date(today); x.setDate(x.getDate() + offset); return x.toISOString().split('T')[0]; };
-    return [
-      { id: 'A001', name: 'Mùa hè xanh', description: 'Chương trình tình nguyện mùa hè', startDate: d(-3), endDate: d(5), location: 'Huyện Cẩm Mỹ', image: '', participants: 25, status: 'ongoing' },
-      { id: 'A002', name: 'Hiến máu nhân đạo', description: 'Ngày hội hiến máu tình nguyện', startDate: d(3), endDate: d(3), location: 'Trường ĐH Công nghệ', image: '', participants: 40, status: 'upcoming' },
-      { id: 'A003', name: 'Xuân tình nguyện 2025', description: 'Chương trình xuân tình nguyện', startDate: d(-30), endDate: d(-20), location: 'Toàn tỉnh', image: '', participants: 50, status: 'completed', report: 'Chương trình thành công với 50 thành viên tham gia.' }
-    ];
+    return DemoData._getActivitiesStore().map(a => ({ ...a }));
+  },
+
+  getActivity({ id }) {
+    const activity = DemoData._getActivitiesStore().find(a => a.id === id);
+    if (!activity) throw new Error('Không tìm thấy hoạt động');
+    return { ...activity };
+  },
+
+  addActivity(data) {
+    const id = 'A' + Date.now();
+    const activity = {
+      id,
+      name: data.name,
+      description: data.description || '',
+      startDate: data.startDate,
+      endDate: data.endDate,
+      location: data.location || '',
+      image: data.image || '',
+      report: '',
+      participants: 0,
+      status: Utils.getActivityStatus(data.startDate, data.endDate)
+    };
+    DemoData._getActivitiesStore().push(activity);
+    return { id, message: 'Đã thêm hoạt động' };
+  },
+
+  updateActivity(data) {
+    const store = DemoData._getActivitiesStore();
+    const idx = store.findIndex(a => a.id === data.id);
+    if (idx === -1) throw new Error('Không tìm thấy hoạt động');
+    const updated = {
+      ...store[idx],
+      name: data.name ?? store[idx].name,
+      description: data.description ?? store[idx].description,
+      startDate: data.startDate ?? store[idx].startDate,
+      endDate: data.endDate ?? store[idx].endDate,
+      location: data.location ?? store[idx].location,
+      report: data.report ?? store[idx].report
+    };
+    updated.status = Utils.getActivityStatus(updated.startDate, updated.endDate);
+    store[idx] = updated;
+    return { message: 'Cập nhật thành công' };
+  },
+
+  deleteActivity({ id }) {
+    const store = DemoData._getActivitiesStore();
+    const idx = store.findIndex(a => a.id === id);
+    if (idx === -1) throw new Error('Không tìm thấy hoạt động');
+    store.splice(idx, 1);
+    return { message: 'Đã xóa hoạt động' };
   },
 
   getAnnouncements() {

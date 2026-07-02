@@ -37,9 +37,6 @@ Pages.login = async function(container) {
                 Chưa có tài khoản? <a href="#register">Đăng ký ngay</a>
               </p>
             </form>
-            <div class="alert alert-info mt-4 small mb-0">
-              <strong>Demo:</strong> admin / admin123 hoặc member / member123
-            </div>
           </div>
         </div>
       </div>

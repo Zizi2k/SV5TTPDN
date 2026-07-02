@@ -31,7 +31,7 @@ Pages.manage = async function(container) {
 
   const tabs = { pending, activities, announcements };
 
-  document.getElementById('manageNav').addEventListener('click', (e) => {
+  document.getElementById('manageNav').addEventListener('click', async (e) => {
     const link = e.target.closest('[data-tab]');
     if (!link) return;
     e.preventDefault();
@@ -41,7 +41,7 @@ Pages.manage = async function(container) {
     const content = document.getElementById('manageContent');
     switch (tab) {
       case 'pending': content.innerHTML = renderPendingTab(tabs.pending); bindPendingEvents(); break;
-      case 'activities': content.innerHTML = renderActivitiesTab(tabs.activities); break;
+      case 'activities': await ActivityCRUD.loadInto(content); break;
       case 'announcements': content.innerHTML = renderAnnouncementsTab(tabs.announcements); break;
       case 'scores': content.innerHTML = renderScoresTab(); break;
       case 'attendance': content.innerHTML = renderAttendanceTab(); break;
@@ -108,37 +108,6 @@ function bindPendingEvents() {
   });
 }
 
-function renderActivitiesTab(activities) {
-  return `
-    <div class="card">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Quản lý hoạt động</h5>
-        <button class="btn btn-sm btn-primary" id="btnAddActivity"><i class="bi bi-plus-lg me-1"></i>Thêm</button>
-      </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead class="table-light">
-              <tr><th>Tên</th><th>Thời gian</th><th>Địa điểm</th><th>Tham gia</th><th>Trạng thái</th></tr>
-            </thead>
-            <tbody>
-              ${activities.map(a => {
-                const st = a.status || Utils.getActivityStatus(a.startDate, a.endDate);
-                return `<tr>
-                  <td>${Utils.escapeHtml(a.name)}</td>
-                  <td>${Utils.formatDate(a.startDate)} - ${Utils.formatDate(a.endDate)}</td>
-                  <td>${Utils.escapeHtml(a.location || '')}</td>
-                  <td>${a.participants || 0}</td>
-                  <td><span class="badge ${Utils.statusClass(st)}">${Utils.statusLabel(st)}</span></td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
-}
 
 function renderAnnouncementsTab(announcements) {
   return `

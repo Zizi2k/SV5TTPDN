@@ -69,7 +69,9 @@ Pages.admin = async function(container) {
     switch (link.dataset.tab) {
       case 'members': content.innerHTML = renderAdminMembers(data.members); bindAdminMemberEvents(); break;
       case 'pending': content.innerHTML = renderAdminPending(data.pending); bindAdminPendingEvents(); break;
-      case 'activities': content.innerHTML = await renderAdminActivities(); break;
+      case 'activities':
+        await ActivityCRUD.loadInto(content);
+        break;
       case 'announcements': content.innerHTML = await renderAdminAnnouncements(); break;
       case 'executive': content.innerHTML = await renderAdminExecutive(); break;
       case 'settings': content.innerHTML = renderAdminSettings(); break;
@@ -188,36 +190,6 @@ function bindAdminPendingEvents() {
       } catch (err) { /* handled */ }
     });
   });
-}
-
-async function renderAdminActivities() {
-  const activities = await API.getActivities();
-  return `
-    <div class="card">
-      <div class="card-header bg-white d-flex justify-content-between">
-        <h5 class="mb-0">Quản lý hoạt động</h5>
-        <button class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> Thêm hoạt động</button>
-      </div>
-      <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-          <thead class="table-light"><tr><th>Tên</th><th>Thời gian</th><th>Tham gia</th><th></th></tr></thead>
-          <tbody>
-            ${activities.map(a => `
-              <tr>
-                <td>${Utils.escapeHtml(a.name)}</td>
-                <td>${Utils.formatDate(a.startDate)} - ${Utils.formatDate(a.endDate)}</td>
-                <td>${a.participants || 0}</td>
-                <td>
-                  <button class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></button>
-                  <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
 }
 
 async function renderAdminAnnouncements() {
