@@ -6,7 +6,7 @@ Pages.profile = async function(container, params) {
   container.innerHTML = `
     <div class="profile-header">
       <div class="container">
-        <img src="${Utils.avatarUrl(member.avatar, member.name)}" alt="${Utils.escapeHtml(member.name)}" class="profile-avatar">
+        <img src="${Utils.avatarUrl(member.avatar, member.name)}" alt="${Utils.escapeHtml(member.name)}" class="profile-avatar" id="publicProfileAvatar">
         <h2 class="mb-1">${Utils.escapeHtml(member.name)}</h2>
         <p class="lead mb-0">${Utils.escapeHtml(member.role)}</p>
         ${member.titles ? `<span class="badge bg-warning text-dark mt-2">${Utils.escapeHtml(member.titles)}</span>` : ''}
@@ -60,4 +60,6 @@ Pages.profile = async function(container, params) {
       </div>
     </div>
   `;
+
+  Utils.bindImageFallback(document.getElementById('publicProfileAvatar'));
 };

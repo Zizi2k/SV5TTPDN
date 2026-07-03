@@ -100,11 +100,13 @@ Pages.myProfile = async function(container) {
         <div class="col-lg-4">
           <div class="profile-section text-center">
             <h5><i class="bi bi-qr-code me-2"></i>Mã QR cá nhân</h5>
-            <div class="bg-light rounded p-4 mb-3">
-              <i class="bi bi-qr-code" style="font-size:8rem; color:var(--primary)"></i>
+            <div class="bg-white rounded p-3 mb-3 d-inline-block border">
+              <div id="personalQrCode"></div>
             </div>
-            <p class="text-muted small">Quét mã QR để điểm danh hoạt động</p>
-            <code class="small">${memberId}</code>
+            <p class="text-muted small">Quét mã để xem thông tin cá nhân của bạn</p>
+            <a href="#profile/${memberId}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
+              <i class="bi bi-box-arrow-up-right me-1"></i>Xem trang công khai
+            </a>
           </div>
 
           <div class="profile-section">
@@ -163,6 +165,7 @@ Pages.myProfile = async function(container) {
   });
   Utils.bindImageFallback(document.getElementById('profileClubLogoPreview'));
   Utils.bindImageFallback(document.getElementById('profileAvatarImg'));
+  Utils.renderQrCode(document.getElementById('personalQrCode'), Utils.buildProfileQrUrl(memberId), 160);
   document.getElementById('btnChangePassword')?.addEventListener('click', () => {
     new bootstrap.Modal(document.getElementById('changePasswordModal')).show();
   });

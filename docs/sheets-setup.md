@@ -1,13 +1,49 @@
 # Hướng dẫn cấu hình Google Sheets
 
-## Tự động (khuyến nghị)
+## Tự động — lần đầu tiên
 
-Chạy hàm `initializeSheets()` trong Google Apps Script Editor. Hàm này sẽ:
+Chạy hàm `initializeSheets()` trong Google Apps Script Editor **một lần duy nhất**. Hàm này sẽ:
 
 1. Tạo Spreadsheet mới với tất cả sheet và cột
 2. Tạo thư mục Google Drive cho ảnh đại diện
 3. Lưu ID vào Script Properties
 4. Thêm dữ liệu mẫu (admin, hoạt động, thông báo)
+
+> **Cảnh báo:** Nếu đã có `SPREADSHEET_ID` trong Script Properties, **không chạy lại** `initializeSheets()` — sẽ tạo database mới và mất liên kết dữ liệu cũ.
+
+## Cập nhật tính năng mới — giữ nguyên dữ liệu cũ
+
+Khi deploy code backend mới (thêm cột QR, điểm danh, logo CLB, v.v.):
+
+### Cách 1: Tự động (khuyến nghị)
+
+1. Copy code GAS mới vào Apps Script Editor
+2. **Deploy** lại Web App (Manage deployments → Edit → New version → Deploy)
+3. Gọi bất kỳ API nào (đăng nhập, mở trang web) — hệ thống **tự nâng cấp schema** nếu cần
+
+Hệ thống chỉ thêm sheet/cột thiếu, **không xóa hay ghi đè** dữ liệu hiện có.
+
+### Cách 2: Chạy thủ công
+
+Trong Apps Script Editor, chọn hàm `upgradeSheets()` → **Run**.
+
+Kết quả ghi vào log:
+- `sheetsCreated`: sheet mới được tạo
+- `columnsAdded`: cột mới được thêm vào sheet nào
+- `settingsAdded`: cài đặt mặc định mới (chỉ thêm nếu chưa có)
+- `activitiesBackfilled`: hoạt động cũ được bổ sung mã QR check-in
+
+### Quy trình cập nhật an toàn
+
+```
+1. Sao lưu Google Sheets (File → Make a copy)
+2. Copy code .gs mới vào Apps Script
+3. Deploy Web App phiên bản mới
+4. Mở website → hệ thống tự migrate (hoặc chạy upgradeSheets())
+5. Kiểm tra dữ liệu cũ vẫn còn nguyên
+```
+
+**Frontend (GitHub Pages)** cập nhật riêng — không ảnh hưởng dữ liệu trong Google Sheets.
 
 ## Thủ công
 
@@ -56,6 +92,8 @@ Nếu muốn dùng Spreadsheet có sẵn, tạo các sheet với cột sau:
 | location | Địa điểm |
 | image | URL hình ảnh |
 | report | Báo cáo (sau khi kết thúc) |
+| checkInCode | Mã QR điểm danh (tự sinh) |
+| qrVisible | TRUE/FALSE — hiển thị QR cho thành viên |
 | createdBy | User ID người tạo |
 | createdAt | Ngày tạo |
 
@@ -109,6 +147,8 @@ Nếu muốn dùng Spreadsheet có sẵn, tạo các sheet với cột sau:
 | memberId | Thành viên |
 | checkedInAt | Thời gian điểm danh |
 | checkedInBy | Người điểm danh |
+| method | qr / manual / proof |
+| proofImage | URL ảnh minh chứng (Google Drive) |
 
 ### Scores
 

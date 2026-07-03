@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
   Router.register('members', Pages.members);
   Router.register('profile', Pages.profile);
   Router.register('activities', Pages.activities);
+  Router.register('checkin', Pages.checkin);
   Router.register('announcements', Pages.announcements);
   Router.register('executive-board', Pages.executiveBoard);
   Router.register('contact', Pages.contact);

@@ -8,6 +8,7 @@ const PAGE_TITLES = {
   members: 'Thành viên',
   profile: 'Hồ sơ thành viên',
   activities: 'Hoạt động',
+  checkin: 'Điểm danh',
   announcements: 'Thông báo',
   'executive-board': 'Ban Chủ nhiệm',
   contact: 'Liên hệ',
@@ -40,6 +41,10 @@ const Router = {
     if (paramParts.length) {
       if (routeName === 'profile') routeParams.id = paramParts[0];
       if (routeName === 'activities') routeParams.id = paramParts[0];
+      if (routeName === 'checkin' && paramParts.length >= 2) {
+        routeParams.activityId = paramParts[0];
+        routeParams.code = paramParts[1].toUpperCase();
+      }
     }
 
     if (!options.force && routeName === this.currentPage &&

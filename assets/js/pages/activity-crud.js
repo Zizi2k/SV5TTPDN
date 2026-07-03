@@ -99,6 +99,14 @@ const ActivityCRUD = {
                     <label class="form-label">Mô tả</label>
                     <textarea class="form-control" name="description" id="activityDescription" rows="3"></textarea>
                   </div>
+                  <div class="col-12">
+                    <label class="form-label">Ảnh hoạt động</label>
+                    <input type="file" class="form-control" id="activityImageInput" accept="image/jpeg,image/png,image/webp">
+                    <div class="mt-2" id="activityImagePreviewWrap">
+                      <img id="activityImagePreview" class="rounded border d-none" style="max-height:120px;object-fit:cover" alt="">
+                    </div>
+                    <p class="form-text mb-0">Hiển thị trên thẻ hoạt động và trang chi tiết (tối đa 5MB)</p>
+                  </div>
                   <div class="col-12" id="activityReportGroup">
                     <label class="form-label">Báo cáo (hoạt động đã kết thúc)</label>
                     <textarea class="form-control" name="report" id="activityReport" rows="3" placeholder="Tóm tắt kết quả hoạt động..."></textarea>
@@ -118,6 +126,13 @@ const ActivityCRUD = {
     `);
 
     document.getElementById('activityForm').addEventListener('submit', (e) => this.handleSubmit(e));
+    document.getElementById('activityImageInput')?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      const preview = document.getElementById('activityImagePreview');
+      if (!file || !preview) return;
+      preview.src = URL.createObjectURL(file);
+      preview.classList.remove('d-none');
+    });
   },
 
   bindEvents(container, reloadFn) {
@@ -175,6 +190,8 @@ const ActivityCRUD = {
     document.getElementById('activityId').value = '';
     document.getElementById('activityModalTitle').textContent = 'Thêm hoạt động';
     document.getElementById('activityReportGroup').classList.add('d-none');
+    const preview = document.getElementById('activityImagePreview');
+    if (preview) { preview.src = ''; preview.classList.add('d-none'); }
     new bootstrap.Modal(document.getElementById(this.modalId)).show();
   },
 
@@ -195,6 +212,18 @@ const ActivityCRUD = {
       document.getElementById('activityDescription').value = activity.description || '';
       document.getElementById('activityReport').value = activity.report || '';
       document.getElementById('activityModalTitle').textContent = 'Sửa hoạt động';
+
+      const preview = document.getElementById('activityImagePreview');
+      if (preview) {
+        if (activity.image) {
+          preview.src = Utils.activityImageUrl(activity.image, activity.name);
+          preview.classList.remove('d-none');
+        } else {
+          preview.src = '';
+          preview.classList.add('d-none');
+        }
+      }
+      document.getElementById('activityImageInput').value = '';
 
       const st = activity.status || Utils.getActivityStatus(activity.startDate, activity.endDate);
       document.getElementById('activityReportGroup').classList.toggle('d-none', st !== 'completed');
@@ -228,12 +257,26 @@ const ActivityCRUD = {
     submitBtn.disabled = true;
 
     try {
+      const imageFile = document.getElementById('activityImageInput')?.files?.[0];
+      let activityId = id;
+
       if (id) {
         await API.updateActivity(id, data);
+        activityId = id;
         Utils.showToast('Đã cập nhật hoạt động', 'success');
       } else {
-        await API.addActivity(data);
+        const result = await API.addActivity(data);
+        activityId = result.id;
         Utils.showToast('Đã thêm hoạt động mới', 'success');
+      }
+
+      if (imageFile && activityId) {
+        if (imageFile.size > 5 * 1024 * 1024) {
+          Utils.showToast('Ảnh không quá 5MB', 'danger');
+        } else {
+          const base64 = await Utils.fileToBase64(imageFile);
+          await API.uploadActivityImage(base64, imageFile.name, activityId);
+        }
       }
 
       bootstrap.Modal.getInstance(document.getElementById(this.modalId))?.hide();
@@ -277,6 +320,7 @@ const ActivityCRUD = {
             <div class="modal-body text-center">
               <p class="text-muted small mb-3" id="activityQrSubtitle"></p>
               <div id="activityQrCanvas" class="d-inline-block p-2 border rounded bg-white mb-3"></div>
+              <p class="small text-muted">Thành viên quét bằng camera điện thoại → tự điểm danh ngay</p>
               <div class="d-flex justify-content-center gap-3 mb-3">
                 <span class="badge bg-primary" id="activityQrCount">0 điểm danh</span>
                 <span class="badge bg-secondary" id="activityQrRegistered">0 đăng ký</span>
@@ -314,11 +358,12 @@ const ActivityCRUD = {
     try {
       const info = await API.getActivityCheckInInfo(id);
       document.getElementById('activityQrTitle').textContent = 'QR điểm danh — ' + info.activityName;
-      document.getElementById('activityQrSubtitle').textContent = 'Thành viên quét mã này hoặc gửi ảnh minh chứng để điểm danh';
+      document.getElementById('activityQrSubtitle').textContent = 'Quét mã để điểm danh tự động (cần đăng nhập & đã đăng ký hoạt động)';
       document.getElementById('activityQrCount').textContent = (info.attendanceCount || 0) + ' điểm danh';
       document.getElementById('activityQrRegistered').textContent = (info.participants || 0) + ' đăng ký';
       document.getElementById('activityQrVisibleToggle').checked = !!info.qrVisible;
-      Utils.renderQrCode(document.getElementById('activityQrCanvas'), info.qrPayload, 220);
+      const qrUrl = Utils.buildCheckInQrUrl(id, info.checkInCode);
+      Utils.renderQrCode(document.getElementById('activityQrCanvas'), qrUrl, 220);
       new bootstrap.Modal(document.getElementById(this.qrModalId)).show();
     } catch (err) { /* handled */ }
   },

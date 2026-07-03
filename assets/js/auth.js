@@ -103,6 +103,12 @@ const Auth = {
   },
 
   redirectAfterLogin(user) {
+    const pending = sessionStorage.getItem('post_login_hash');
+    if (pending) {
+      sessionStorage.removeItem('post_login_hash');
+      window.location.hash = pending;
+      return;
+    }
     switch (user.role) {
       case 'admin': Router.go('admin'); break;
       case 'executive': Router.go('manage'); break;

@@ -304,9 +304,59 @@ const Utils = {
 
   parseCheckInQrPayload(text) {
     if (!text) return null;
-    const m = String(text).match(/^SV5TTPDN:CHECKIN:([^:]+):([A-Z0-9]+)$/i);
-    if (!m) return null;
-    return { activityId: m[1], checkInCode: m[2].toUpperCase() };
+    const str = String(text).trim();
+    const urlMatch = str.match(/#checkin\/([^/?#]+)\/([A-Z0-9]+)/i);
+    if (urlMatch) {
+      return { activityId: urlMatch[1], checkInCode: urlMatch[2].toUpperCase() };
+    }
+    const legacy = str.match(/^SV5TTPDN:CHECKIN:([^:]+):([A-Z0-9]+)$/i);
+    if (legacy) {
+      return { activityId: legacy[1], checkInCode: legacy[2].toUpperCase() };
+    }
+    return null;
+  },
+
+  appBaseUrl() {
+    return window.location.href.split('#')[0];
+  },
+
+  buildCheckInQrUrl(activityId, checkInCode) {
+    return `${this.appBaseUrl()}#checkin/${activityId}/${checkInCode}`;
+  },
+
+  buildProfileQrUrl(memberId) {
+    return `${this.appBaseUrl()}#profile/${memberId}`;
+  },
+
+  defaultActivityImage(name) {
+    const initial = (name || '?').charAt(0).toUpperCase();
+    return `data:image/svg+xml,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">` +
+      `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+      `<stop offset="0%" stop-color="#2563EB"/><stop offset="100%" stop-color="#1D4ED8"/></linearGradient></defs>` +
+      `<rect fill="url(#g)" width="400" height="200"/>` +
+      `<text x="200" y="120" text-anchor="middle" fill="white" font-size="64" font-family="Arial">${initial}</text></svg>`
+    )}`;
+  },
+
+  activityImageUrl(url, name) {
+    return this.normalizeImageUrl(url) || this.defaultActivityImage(name);
+  },
+
+  renderActivityCover(img, activity) {
+    if (!img) return;
+    img.src = this.activityImageUrl(activity.image, activity.name);
+    img.alt = activity.name || 'Hoạt động';
+    this.bindImageFallback(img, this.defaultActivityImage(activity.name));
+  },
+
+  async uploadActivityImageFile(activityId, onSuccess) {
+    const file = await this.pickImageFile();
+    if (!file) return null;
+    const base64 = await this.fileToBase64(file);
+    const result = await API.uploadActivityImage(base64, file.name, activityId);
+    if (onSuccess) onSuccess(result);
+    return result;
   },
 
   renderQrCode(container, text, size = 200) {
@@ -392,13 +442,5 @@ const Utils = {
     link.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
     link.click();
     URL.revokeObjectURL(link.href);
-  },
-
-  parseCheckInQrPayload(payload) {
-    const prefix = 'SV5TTPDN:CHECKIN:';
-    if (!payload || typeof payload !== 'string' || !payload.startsWith(prefix)) return null;
-    const parts = payload.slice(prefix.length).split(':');
-    if (parts.length !== 2) return null;
-    return { activityId: parts[0], checkInCode: parts[1] };
   }
 };

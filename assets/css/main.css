@@ -117,7 +117,22 @@ body {
 }
 
 /* Activity cards */
-.activity-card { position: relative; }
+.activity-card { position: relative; overflow: hidden; }
+.activity-card .activity-cover {
+  height: 140px;
+  width: 100%;
+  object-fit: cover;
+  display: block;
+}
+.activity-card .activity-cover-placeholder {
+  height: 140px;
+}
+.activity-detail-cover {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
 .activity-card .status-badge {
   position: absolute;
   top: 12px;

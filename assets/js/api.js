@@ -154,6 +154,7 @@ const API = {
   // Upload avatar (base64)
   uploadAvatar: (base64, filename, memberId) => API.request('uploadAvatar', { base64, filename, memberId }),
   uploadClubLogo: (base64, filename) => API.request('uploadClubLogo', { base64, filename }),
+  uploadActivityImage: (base64, filename, activityId) => API.request('uploadActivityImage', { base64, filename, activityId }),
 
   // Demo data khi chưa cấu hình API
   _demoResponse(action, data) {
@@ -218,7 +219,8 @@ const DemoData = {
   },
 
   _demoQrPayload(activityId) {
-    return 'SV5TTPDN:CHECKIN:' + activityId + ':' + this._demoCheckInCode(activityId);
+    const code = this._demoCheckInCode(activityId);
+    return Utils.buildCheckInQrUrl(activityId, code);
   },
 
   _isDemoRegistered(activityId, user) {
@@ -513,31 +515,31 @@ const DemoData = {
     return { ...info, message: activity.qrVisible ? 'Đã hiển thị QR cho thành viên' : 'Đã ẩn QR khỏi thành viên' };
   },
 
-  memberCheckIn({ activityId, method, qrPayload, proofImage }) {
+  memberCheckIn(data) {
     const user = typeof Auth !== 'undefined' ? Auth.getUser() : null;
     const memberId = user?.memberId || user?.id || 'M001';
-    if (!DemoData._isDemoRegistered(activityId, user)) {
+    if (!DemoData._isDemoRegistered(data.activityId, user)) {
       throw new Error('Bạn chưa đăng ký tham gia hoạt động này');
     }
     const store = DemoData._getAttendanceStore();
-    if (store.some(a => a.activityId === activityId && a.memberId === memberId)) {
+    if (store.some(a => a.activityId === data.activityId && a.memberId === memberId)) {
       throw new Error('Đã điểm danh');
     }
-    if (method === 'qr') {
-      const parsed = Utils.parseCheckInQrPayload(payload.qrPayload || '');
-      const code = payload.checkInCode || (parsed ? parsed.checkInCode : '');
-      const expected = DemoData._demoCheckInCode(activityId);
+    if (data.method === 'qr') {
+      const parsed = Utils.parseCheckInQrPayload(data.qrPayload || '');
+      const code = data.checkInCode || (parsed ? parsed.checkInCode : '');
+      const expected = DemoData._demoCheckInCode(data.activityId);
       if (!code || code.toUpperCase() !== expected) throw new Error('Mã QR không hợp lệ');
-    } else if (method === 'manual') {
-      if (!proofImage) throw new Error('Vui lòng gửi ảnh minh chứng');
+    } else if (data.method === 'manual') {
+      if (!data.proofImage) throw new Error('Vui lòng gửi ảnh minh chứng');
     } else {
       throw new Error('Phương thức điểm danh không hợp lệ');
     }
     store.push({
-      activityId,
+      activityId: data.activityId,
       memberId,
-      method: method || 'manual',
-      proofImage: proofImage || '',
+      method: data.method || 'manual',
+      proofImage: data.proofImage || '',
       checkedInAt: new Date().toISOString(),
       checkedInBy: user?.id || memberId
     });
@@ -645,5 +647,13 @@ const DemoData = {
     const url = `data:${mime};base64,${base64}`;
     localStorage.setItem('club_logo', url);
     return { url };
+  },
+
+  uploadActivityImage({ base64, filename, activityId }) {
+    const mime = (filename || '').toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const url = `data:${mime};base64,${base64}`;
+    const activity = DemoData._getActivitiesStore().find(a => a.id === activityId);
+    if (activity) activity.image = url;
+    return { url, activityId };
   }
 };

@@ -12,6 +12,12 @@ function doPost(e) {
 }
 
 function handleRequest(e, method) {
+  try {
+    ensureDatabaseSchema();
+  } catch (migrateErr) {
+    Logger.log('Schema migration: ' + migrateErr.message);
+  }
+
   let payload = {};
   try {
     if (method === 'POST' && e.postData) {
@@ -103,9 +109,10 @@ function routeAction(action, payload) {
     getSettings: () => getSettings(),
     uploadAvatar: () => uploadAvatar(payload.base64, payload.filename, payload._user, payload.memberId),
     uploadClubLogo: () => requireRole(payload._user, ['admin']) || uploadClubLogo(payload.base64, payload.filename, payload._user),
+    uploadActivityImage: () => requireRole(payload._user, ['admin', 'executive']) || uploadActivityImage(payload.base64, payload.filename, payload._user, payload.activityId),
 
-    // Setup helper
-    initializeSheets: () => initializeSheets()
+    // Setup helper (chỉ admin — dùng khi cần nâng cấp thủ công)
+    upgradeSheets: () => requireRole(payload._user, ['admin']) || upgradeSheets()
   };
 
   if (!routes[action]) {

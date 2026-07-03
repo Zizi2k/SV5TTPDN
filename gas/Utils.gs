@@ -212,6 +212,34 @@ function uploadClubLogo(base64, filename, user) {
   return { url };
 }
 
+function uploadActivityImage(base64, filename, user, activityId) {
+  if (!base64) throw new Error('Không có dữ liệu ảnh');
+  if (!user || (user.role !== 'admin' && user.role !== 'executive')) {
+    throw new Error('Bạn không có quyền đổi ảnh hoạt động');
+  }
+  if (!activityId) throw new Error('Thiếu mã hoạt động');
+
+  const activities = getSheetData(SHEET_NAMES.ACTIVITIES);
+  const existing = activities.find(a => a.id === activityId);
+  if (!existing) throw new Error('Không tìm thấy hoạt động');
+
+  const folderId = PropertiesService.getScriptProperties().getProperty('AVATAR_FOLDER_ID');
+  if (!folderId) throw new Error('Chưa cấu hình AVATAR_FOLDER_ID');
+
+  if (existing.image) trashDriveFile(existing.image);
+
+  const mimeType = (filename || '').toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+  const blob = Utilities.newBlob(Utilities.base64Decode(base64), mimeType, filename || 'activity.jpg');
+  const folder = DriveApp.getFolderById(folderId);
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  const url = 'https://drive.google.com/uc?id=' + file.getId();
+
+  updateRow(SHEET_NAMES.ACTIVITIES, activityId, { image: url });
+  logAudit('UPLOAD_ACTIVITY_IMAGE', activityId, null);
+  return { url, activityId };
+}
+
 function setSetting(key, value) {
   const sheet = getSheet(SHEET_NAMES.SETTINGS);
   const data = sheet.getDataRange().getValues();
