@@ -3,6 +3,7 @@
  */
 const ActivityCRUD = {
   modalId: 'activityFormModal',
+  qrModalId: 'activityQrModal',
 
   renderTable(activities) {
     const rows = activities.length ? activities.map(a => {
@@ -15,6 +16,14 @@ const ActivityCRUD = {
           <td>${a.participants || 0}</td>
           <td><span class="badge ${Utils.statusClass(st)}">${Utils.statusLabel(st)}</span></td>
           <td class="text-nowrap">
+            ${st === 'ongoing' ? `
+              <button class="btn btn-sm btn-outline-success btn-activity-qr" data-id="${a.id}" title="QR điểm danh">
+                <i class="bi bi-qr-code"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-secondary btn-export-attendance" data-id="${a.id}" title="Xuất điểm danh">
+                <i class="bi bi-file-earmark-excel"></i>
+              </button>
+            ` : ''}
             <button class="btn btn-sm btn-outline-primary btn-edit-activity" data-id="${a.id}" title="Sửa">
               <i class="bi bi-pencil"></i>
             </button>
@@ -138,6 +147,20 @@ const ActivityCRUD = {
         return;
       }
 
+      const qrBtn = e.target.closest('.btn-activity-qr');
+      if (qrBtn) {
+        e.preventDefault();
+        this.openQrModal(qrBtn.dataset.id);
+        return;
+      }
+
+      const exportBtn = e.target.closest('.btn-export-attendance');
+      if (exportBtn) {
+        e.preventDefault();
+        this.exportAttendance(exportBtn.dataset.id);
+        return;
+      }
+
       const deleteBtn = e.target.closest('.btn-delete-activity');
       if (deleteBtn) {
         e.preventDefault();
@@ -237,6 +260,90 @@ const ActivityCRUD = {
   async loadInto(container) {
     const activities = await API.getActivities();
     container.innerHTML = this.renderTable(activities);
+    this.ensureQrModal();
     this.bindEvents(container, () => this.loadInto(container));
+  },
+
+  ensureQrModal() {
+    if (document.getElementById(this.qrModalId)) return;
+    document.body.insertAdjacentHTML('beforeend', `
+      <div class="modal fade" id="${this.qrModalId}" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="activityQrTitle">QR điểm danh</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+              <p class="text-muted small mb-3" id="activityQrSubtitle"></p>
+              <div id="activityQrCanvas" class="d-inline-block p-2 border rounded bg-white mb-3"></div>
+              <div class="d-flex justify-content-center gap-3 mb-3">
+                <span class="badge bg-primary" id="activityQrCount">0 điểm danh</span>
+                <span class="badge bg-secondary" id="activityQrRegistered">0 đăng ký</span>
+              </div>
+              <div class="form-check form-switch d-flex justify-content-center mb-3">
+                <input class="form-check-input me-2" type="checkbox" id="activityQrVisibleToggle">
+                <label class="form-check-label" for="activityQrVisibleToggle">Hiển thị QR cho thành viên đã đăng ký</label>
+              </div>
+              <button type="button" class="btn btn-success" id="btnExportActivityAttendance">
+                <i class="bi bi-file-earmark-excel me-1"></i>Xuất Excel điểm danh
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `);
+
+    document.getElementById('activityQrVisibleToggle')?.addEventListener('change', async (e) => {
+      const id = this._currentQrActivityId;
+      if (!id) return;
+      try {
+        await API.setActivityQrVisible(id, e.target.checked);
+        Utils.showToast(e.target.checked ? 'Đã hiển thị QR cho thành viên' : 'Đã ẩn QR', 'success');
+      } catch (err) { e.target.checked = !e.target.checked; }
+    });
+
+    document.getElementById('btnExportActivityAttendance')?.addEventListener('click', () => {
+      if (this._currentQrActivityId) this.exportAttendance(this._currentQrActivityId);
+    });
+  },
+
+  async openQrModal(id) {
+    this.ensureQrModal();
+    this._currentQrActivityId = id;
+    try {
+      const info = await API.getActivityCheckInInfo(id);
+      document.getElementById('activityQrTitle').textContent = 'QR điểm danh — ' + info.activityName;
+      document.getElementById('activityQrSubtitle').textContent = 'Thành viên quét mã này hoặc gửi ảnh minh chứng để điểm danh';
+      document.getElementById('activityQrCount').textContent = (info.attendanceCount || 0) + ' điểm danh';
+      document.getElementById('activityQrRegistered').textContent = (info.participants || 0) + ' đăng ký';
+      document.getElementById('activityQrVisibleToggle').checked = !!info.qrVisible;
+      Utils.renderQrCode(document.getElementById('activityQrCanvas'), info.qrPayload, 220);
+      new bootstrap.Modal(document.getElementById(this.qrModalId)).show();
+    } catch (err) { /* handled */ }
+  },
+
+  async exportAttendance(id) {
+    try {
+      const data = await API.getActivityAttendanceList(id);
+      const act = data.activity;
+      await Utils.exportToExcel(data.rows, `diem-danh-${act.id}.xlsx`, {
+        sheetName: 'Điểm danh',
+        title: `CLB SV5T — Điểm danh: ${act.name}`,
+        columns: [
+          { header: 'STT', key: 'stt' },
+          { header: 'Mã TV', key: 'memberId' },
+          { header: 'Họ tên', key: 'name' },
+          { header: 'MSSV', key: 'mssv' },
+          { header: 'Trường', key: 'school' },
+          { header: 'Khoa', key: 'faculty' },
+          { header: 'SĐT', key: 'phone' },
+          { header: 'Thời gian', key: 'checkedInAt' },
+          { header: 'Hình thức', key: 'method' },
+          { header: 'Minh chứng', key: 'proofImage' }
+        ]
+      });
+      Utils.showToast('Đã xuất file Excel', 'success');
+    } catch (err) { /* handled */ }
   }
 };

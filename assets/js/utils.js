@@ -300,5 +300,105 @@ const Utils = {
     link.href = URL.createObjectURL(blob);
     link.download = filename;
     link.click();
+  },
+
+  parseCheckInQrPayload(text) {
+    if (!text) return null;
+    const m = String(text).match(/^SV5TTPDN:CHECKIN:([^:]+):([A-Z0-9]+)$/i);
+    if (!m) return null;
+    return { activityId: m[1], checkInCode: m[2].toUpperCase() };
+  },
+
+  renderQrCode(container, text, size = 200) {
+    if (!container || !text) return;
+    container.innerHTML = '';
+    if (typeof QRCode !== 'undefined') {
+      new QRCode(container, { text, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
+    } else {
+      container.textContent = text;
+    }
+  },
+
+  async exportToExcel(data, filename, options = {}) {
+    if (!data || !data.length) {
+      this.showToast('Không có dữ liệu để xuất', 'warning');
+      return;
+    }
+    if (typeof ExcelJS === 'undefined') {
+      this.showToast('Thư viện ExcelJS chưa được tải', 'danger');
+      return;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet(options.sheetName || 'Sheet1');
+    const columns = options.columns;
+    const headers = columns ? columns.map(c => c.header) : Object.keys(data[0]);
+    const keys = columns ? columns.map(c => c.key) : Object.keys(data[0]);
+
+    const headerRow = ws.addRow(headers);
+    headerRow.height = 22;
+    headerRow.eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF1E40AF' } },
+        left: { style: 'thin', color: { argb: 'FF1E40AF' } },
+        bottom: { style: 'thin', color: { argb: 'FF1E40AF' } },
+        right: { style: 'thin', color: { argb: 'FF1E40AF' } }
+      };
+    });
+
+    data.forEach((row, rowIndex) => {
+      const values = keys.map(k => row[k] ?? '');
+      const dataRow = ws.addRow(values);
+      const fillArgb = rowIndex % 2 === 0 ? 'FFF8FAFC' : 'FFFFFFFF';
+      dataRow.eachCell(cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillArgb } };
+        cell.alignment = { vertical: 'middle', wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+        };
+      });
+    });
+
+    ws.columns.forEach((col, i) => {
+      let maxLen = String(headers[i] || '').length;
+      data.forEach(row => {
+        const len = String(row[keys[i]] ?? '').length;
+        if (len > maxLen) maxLen = len;
+      });
+      col.width = Math.min(Math.max(maxLen + 3, 12), 55);
+    });
+
+    if (options.title) {
+      ws.insertRow(1, [options.title]);
+      ws.mergeCells(1, 1, 1, headers.length);
+      const titleCell = ws.getCell(1, 1);
+      titleCell.font = { bold: true, size: 14, color: { argb: 'FF1E40AF' } };
+      titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(1).height = 28;
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  },
+
+  parseCheckInQrPayload(payload) {
+    const prefix = 'SV5TTPDN:CHECKIN:';
+    if (!payload || typeof payload !== 'string' || !payload.startsWith(prefix)) return null;
+    const parts = payload.slice(prefix.length).split(':');
+    if (parts.length !== 2) return null;
+    return { activityId: parts[0], checkInCode: parts[1] };
   }
 };

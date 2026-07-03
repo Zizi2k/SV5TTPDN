@@ -139,6 +139,11 @@ const API = {
 
   // Attendance
   checkIn: (activityId, qrCode) => API.request('checkIn', { activityId, qrCode }),
+  getActivityCheckInInfo: (activityId) => API.request('getActivityCheckInInfo', { activityId }, { useCache: false }),
+  setActivityQrVisible: (activityId, visible) => API.request('setActivityQrVisible', { activityId, visible }),
+  memberCheckIn: (activityId, data) => API.request('memberCheckIn', { activityId, ...data }),
+  getActivityAttendanceList: (activityId) => API.request('getActivityAttendanceList', { activityId }, { useCache: false }),
+  uploadAttendanceProof: (base64, filename, activityId) => API.request('uploadAttendanceProof', { base64, filename, activityId }),
 
   // Admin
   getDashboard: () => API.request('getDashboard'),
@@ -174,6 +179,8 @@ const DemoData = {
   _members: null,
   _pending: null,
   _announcements: null,
+  _attendance: null,
+  _participants: null,
 
   _getMembersStore() {
     if (!this._members) {
@@ -195,6 +202,31 @@ const DemoData = {
     return this._pending;
   },
 
+
+  _getParticipantsStore() {
+    if (!this._participants) this._participants = { A001: ['M001'] };
+    return this._participants;
+  },
+
+  _getAttendanceStore() {
+    if (!this._attendance) this._attendance = [];
+    return this._attendance;
+  },
+
+  _demoCheckInCode(activityId) {
+    return 'DEMO' + String(activityId).slice(-4).padStart(4, '0');
+  },
+
+  _demoQrPayload(activityId) {
+    return 'SV5TTPDN:CHECKIN:' + activityId + ':' + this._demoCheckInCode(activityId);
+  },
+
+  _isDemoRegistered(activityId, user) {
+    const uid = user?.memberId || user?.id;
+    if (!uid) return false;
+    const parts = this._getParticipantsStore();
+    return (parts[activityId] || []).includes(uid);
+  },
   _getAnnouncementsStore() {
     if (!this._announcements) {
       this._announcements = [
@@ -210,9 +242,9 @@ const DemoData = {
       const today = new Date();
       const d = (offset) => { const x = new Date(today); x.setDate(x.getDate() + offset); return x.toISOString().split('T')[0]; };
       this._activities = [
-        { id: 'A001', name: 'Mùa hè xanh', description: 'Chương trình tình nguyện mùa hè', startDate: d(-3), endDate: d(5), location: 'Huyện Cẩm Mỹ', image: '', participants: 25, status: 'ongoing', report: '' },
-        { id: 'A002', name: 'Hiến máu nhân đạo', description: 'Ngày hội hiến máu tình nguyện', startDate: d(3), endDate: d(3), location: 'Trường ĐH Công nghệ', image: '', participants: 40, status: 'upcoming', report: '' },
-        { id: 'A003', name: 'Xuân tình nguyện 2025', description: 'Chương trình xuân tình nguyện', startDate: d(-30), endDate: d(-20), location: 'Toàn tỉnh', image: '', participants: 50, status: 'completed', report: 'Chương trình thành công với 50 thành viên tham gia.' }
+        { id: 'A001', name: 'Mùa hè xanh', description: 'Chương trình tình nguyện mùa hè', startDate: d(-3), endDate: d(5), location: 'Huyện Cẩm Mỹ', image: '', participants: 25, status: 'ongoing', report: '', qrVisible: false, attendanceCount: 0 },
+        { id: 'A002', name: 'Hiến máu nhân đạo', description: 'Ngày hội hiến máu tình nguyện', startDate: d(3), endDate: d(3), location: 'Trường ĐH Công nghệ', image: '', participants: 40, status: 'upcoming', report: '', qrVisible: false, attendanceCount: 0 },
+        { id: 'A003', name: 'Xuân tình nguyện 2025', description: 'Chương trình xuân tình nguyện', startDate: d(-30), endDate: d(-20), location: 'Toàn tỉnh', image: '', participants: 50, status: 'completed', qrVisible: false, attendanceCount: 0, report: 'Chương trình thành công với 50 thành viên tham gia.' }
       ];
     }
     return this._activities;
@@ -440,6 +472,134 @@ const DemoData = {
 
   addScore() { return { message: 'Đã cộng điểm', total: 0 }; },
 
+
+  getActivityCheckInInfo({ activityId }) {
+    const activity = DemoData._getActivitiesStore().find(a => a.id === activityId);
+    if (!activity) throw new Error('Không tìm thấy hoạt động');
+    const user = typeof Auth !== 'undefined' ? Auth.getUser() : null;
+    const isAdmin = user && (user.role === 'admin' || user.role === 'executive');
+    const registered = DemoData._isDemoRegistered(activityId, user);
+    const qrVisible = !!activity.qrVisible;
+    if (!isAdmin && !registered) {
+      throw new Error('Bạn chưa đăng ký tham gia hoạt động này');
+    }
+    const memberId = user?.memberId || user?.id;
+    const alreadyCheckedIn = DemoData._getAttendanceStore().some(a => a.activityId === activityId && a.memberId === memberId);
+    const attendanceCount = DemoData._getAttendanceStore().filter(a => a.activityId === activityId).length;
+    return {
+      activityId,
+      activityName: activity.name,
+      status: activity.status || Utils.getActivityStatus(activity.startDate, activity.endDate),
+      checkInCode: DemoData._demoCheckInCode(activityId),
+      qrPayload: (isAdmin || (qrVisible && registered)) ? DemoData._demoQrPayload(activityId) : (isAdmin ? DemoData._demoQrPayload(activityId) : ''),
+      qrVisible,
+      canSeeQr: isAdmin || (qrVisible && registered),
+      canManage: !!isAdmin,
+      isRegistered: registered,
+      registered,
+      hasCheckedIn: alreadyCheckedIn,
+      alreadyCheckedIn,
+      attendanceCount,
+      participants: (DemoData._getParticipantsStore()[activityId] || []).length,
+      isAdmin: !!isAdmin
+    };
+  },
+
+  setActivityQrVisible({ activityId, visible }) {
+    const activity = DemoData._getActivitiesStore().find(a => a.id === activityId);
+    if (!activity) throw new Error('Không tìm thấy hoạt động');
+    activity.qrVisible = visible === true || visible === 'true' || visible === true;
+    const info = DemoData.getActivityCheckInInfo({ activityId });
+    return { ...info, message: activity.qrVisible ? 'Đã hiển thị QR cho thành viên' : 'Đã ẩn QR khỏi thành viên' };
+  },
+
+  memberCheckIn({ activityId, method, qrPayload, proofImage }) {
+    const user = typeof Auth !== 'undefined' ? Auth.getUser() : null;
+    const memberId = user?.memberId || user?.id || 'M001';
+    if (!DemoData._isDemoRegistered(activityId, user)) {
+      throw new Error('Bạn chưa đăng ký tham gia hoạt động này');
+    }
+    const store = DemoData._getAttendanceStore();
+    if (store.some(a => a.activityId === activityId && a.memberId === memberId)) {
+      throw new Error('Đã điểm danh');
+    }
+    if (method === 'qr') {
+      const parsed = Utils.parseCheckInQrPayload(payload.qrPayload || '');
+      const code = payload.checkInCode || (parsed ? parsed.checkInCode : '');
+      const expected = DemoData._demoCheckInCode(activityId);
+      if (!code || code.toUpperCase() !== expected) throw new Error('Mã QR không hợp lệ');
+    } else if (method === 'manual') {
+      if (!proofImage) throw new Error('Vui lòng gửi ảnh minh chứng');
+    } else {
+      throw new Error('Phương thức điểm danh không hợp lệ');
+    }
+    store.push({
+      activityId,
+      memberId,
+      method: method || 'manual',
+      proofImage: proofImage || '',
+      checkedInAt: new Date().toISOString(),
+      checkedInBy: user?.id || memberId
+    });
+    return { message: 'Điểm danh thành công' };
+  },
+
+  getActivityAttendanceList({ activityId }) {
+    const activity = DemoData._getActivitiesStore().find(a => a.id === activityId);
+    if (!activity) throw new Error('Không tìm thấy hoạt động');
+    const members = DemoData._getMembersStore();
+    const rows = DemoData._getAttendanceStore()
+      .filter(a => a.activityId === activityId)
+      .map((att, index) => {
+        const m = members.find(mem => mem.id === att.memberId);
+        return {
+          stt: index + 1,
+          memberId: att.memberId,
+          name: m ? m.name : 'Unknown',
+          mssv: m ? m.mssv : '',
+          email: m ? m.email : '',
+          phone: m ? m.phone : '',
+          method: att.method || 'manual',
+          proofImage: att.proofImage || '',
+          checkedInAt: att.checkedInAt,
+          checkedInBy: att.checkedInBy
+        };
+      });
+    return {
+      activity: { ...activity, attendanceCount: rows.length },
+      rows
+    };
+  },
+
+  uploadAttendanceProof({ base64, filename }) {
+    const mime = (filename || '').toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+    return { url: `data:${mime};base64,${base64}` };
+  },
+
+
+  getActivityParticipants({ activityId }) {
+    const parts = DemoData._getParticipantsStore()[activityId] || [];
+    const members = DemoData._getMembersStore();
+    return parts.map(memberId => {
+      const m = members.find(mem => mem.id === memberId);
+      return {
+        memberId,
+        name: m ? m.name : 'Unknown',
+        joinedAt: new Date().toISOString()
+      };
+    });
+  },
+  joinActivity({ activityId }) {
+    const user = typeof Auth !== 'undefined' ? Auth.getUser() : null;
+    const memberId = user?.memberId || user?.id || 'M001';
+    const parts = DemoData._getParticipantsStore();
+    if (!parts[activityId]) parts[activityId] = [];
+    if (parts[activityId].includes(memberId)) throw new Error('Bạn đã đăng ký hoạt động này');
+    parts[activityId].push(memberId);
+    const activity = DemoData._getActivitiesStore().find(a => a.id === activityId);
+    if (activity) activity.participants = parts[activityId].length;
+    return { message: 'Đã đăng ký tham gia' };
+  },
   checkIn() { return { message: 'Điểm danh thành công' }; },
 
   updateProfile(data) {

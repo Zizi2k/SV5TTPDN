@@ -73,6 +73,11 @@ function routeAction(action, payload) {
     deleteActivity: () => requireRole(payload._user, ['admin', 'executive']) || deleteActivity(payload.id),
     joinActivity: () => joinActivity(payload.activityId, payload._user),
     getActivityParticipants: () => getActivityParticipants(payload.activityId),
+    getActivityCheckInInfo: () => getActivityCheckInInfo(payload.activityId, payload._user),
+    setActivityQrVisible: () => requireRole(payload._user, ['admin', 'executive']) || setActivityQrVisible(payload.activityId, payload.visible, payload._user),
+    memberCheckIn: () => memberCheckIn(payload.activityId, payload, payload._user),
+    getActivityAttendanceList: () => requireRole(payload._user, ['admin', 'executive']) || getActivityAttendanceList(payload.activityId, payload._user),
+    uploadAttendanceProof: () => uploadAttendanceProof(payload.base64, payload.filename),
 
     // Announcements
     getAnnouncements: () => getAnnouncements(payload),

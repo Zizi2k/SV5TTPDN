@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Cache & state SPA — giảm gọi API trùng lặp
  */
 const AppStore = {
@@ -62,7 +62,10 @@ const CACHE_INVALIDATION = {
   deleteAnnouncement: ['getAnnouncements'],
   togglePinAnnouncement: ['getAnnouncements'],
   addScore: ['getScores', 'getMember'],
-  checkIn: [],
+  checkIn: ['getActivities', 'getActivity'],
+  memberCheckIn: ['getActivities', 'getActivity'],
+  setActivityQrVisible: ['getActivities', 'getActivity'],
+  uploadAttendanceProof: [],
   updateProfile: ['getMember'],
   changePassword: [],
   uploadAvatar: ['getMember', 'getMembers'],

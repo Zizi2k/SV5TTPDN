@@ -1,4 +1,4 @@
-Pages.members = async function(container) {
+﻿Pages.members = async function(container) {
   const members = await API.getMembers();
 
   const schools = [...new Set(members.map(m => m.school).filter(Boolean))];
@@ -94,8 +94,32 @@ Pages.members = async function(container) {
     document.getElementById(id).addEventListener('change', filterMembers);
   });
 
-  document.getElementById('exportMembers')?.addEventListener('click', () => {
-    Utils.exportToCSV(allMembers, 'danh-sach-thanh-vien.csv');
+  document.getElementById('exportMembers')?.addEventListener('click', async () => {
+    await Utils.exportToExcel(allMembers.map(m => ({
+      id: m.id,
+      name: m.name,
+      mssv: m.mssv || '',
+      email: m.email || '',
+      phone: m.phone || '',
+      role: m.role || '',
+      school: m.school || '',
+      faculty: m.faculty || '',
+      cohort: m.cohort || ''
+    })), 'danh-sach-thanh-vien.xlsx', {
+      sheetName: 'Thành viên',
+      title: 'Danh sách thành viên CLB SV5T',
+      columns: [
+        { header: 'Mã', key: 'id' },
+        { header: 'Họ tên', key: 'name' },
+        { header: 'MSSV', key: 'mssv' },
+        { header: 'Email', key: 'email' },
+        { header: 'SĐT', key: 'phone' },
+        { header: 'Vai trò', key: 'role' },
+        { header: 'Trường', key: 'school' },
+        { header: 'Khoa', key: 'faculty' },
+        { header: 'Khóa', key: 'cohort' }
+      ]
+    });
     Utils.showToast('Đã xuất file Excel', 'success');
   });
 };

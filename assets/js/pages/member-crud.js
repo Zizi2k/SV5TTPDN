@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Quản lý thành viên: thêm, sửa, xóa, khóa, reset MK
  */
 const MemberCRUD = {
@@ -168,7 +168,31 @@ const MemberCRUD = {
       if (e.target.closest('#exportAllMembers')) {
         e.preventDefault();
         const members = await API.getMembers();
-        Utils.exportToCSV(members, 'thanh-vien-sv5t.csv');
+        await Utils.exportToExcel(members.map(m => ({
+          id: m.id,
+          name: m.name,
+          mssv: m.mssv || '',
+          email: m.email || '',
+          phone: m.phone || '',
+          role: m.role || '',
+          school: m.school || '',
+          faculty: m.faculty || '',
+          cohort: m.cohort || ''
+        })), 'thanh-vien-sv5t.xlsx', {
+          sheetName: 'Thành viên',
+          title: 'Danh sách thành viên CLB SV5T',
+          columns: [
+            { header: 'Mã', key: 'id' },
+            { header: 'Họ tên', key: 'name' },
+            { header: 'MSSV', key: 'mssv' },
+            { header: 'Email', key: 'email' },
+            { header: 'SĐT', key: 'phone' },
+            { header: 'Vai trò', key: 'role' },
+            { header: 'Trường', key: 'school' },
+            { header: 'Khoa', key: 'faculty' },
+            { header: 'Khóa', key: 'cohort' }
+          ]
+        });
         Utils.showToast('Đã xuất file', 'success');
         return;
       }

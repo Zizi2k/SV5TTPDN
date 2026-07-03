@@ -67,6 +67,19 @@ Pages.activityDetail = async function(container, id) {
   const activity = activities.find(a => a.id === id) || activities[0];
   const status = activity.status || Utils.getActivityStatus(activity.startDate, activity.endDate);
 
+  let checkInInfo = null;
+  if (Auth.isLoggedIn() && status === 'ongoing') {
+    try {
+      checkInInfo = await API.getActivityCheckInInfo(id);
+    } catch { checkInInfo = null; }
+  }
+
+  const isRegistered = checkInInfo && (checkInInfo.isRegistered || checkInInfo.registered);
+  const hasCheckedIn = checkInInfo && (checkInInfo.hasCheckedIn || checkInInfo.alreadyCheckedIn);
+  const showCheckIn = isRegistered && !hasCheckedIn && status === 'ongoing';
+  const showQr = checkInInfo && checkInInfo.qrPayload && (checkInInfo.canSeeQr || checkInInfo.qrVisible || checkInInfo.isAdmin);
+  const alreadyCheckedIn = hasCheckedIn;
+
   container.innerHTML = `
     <div class="container py-4">
       <nav aria-label="breadcrumb" class="mb-3">
@@ -103,6 +116,31 @@ Pages.activityDetail = async function(container, id) {
             <p>${Utils.escapeHtml(activity.report)}</p>
           ` : ''}
 
+          ${alreadyCheckedIn ? `
+            <div class="alert alert-success mt-4"><i class="bi bi-check-circle me-2"></i>Bạn đã điểm danh hoạt động này.</div>
+          ` : ''}
+
+          ${showCheckIn ? `
+            <div class="card mt-4 border-success">
+              <div class="card-header bg-success text-white"><i class="bi bi-qr-code me-2"></i>Điểm danh hoạt động</div>
+              <div class="card-body text-center">
+                ${showQr ? `
+                  <p class="text-muted small">Quét mã QR hoặc chụp ảnh minh chứng tham gia</p>
+                  <div id="memberActivityQr" class="d-inline-block p-2 border rounded bg-white mb-3"></div>
+                  <div class="d-flex flex-wrap gap-2 justify-content-center mb-3">
+                    <button class="btn btn-primary" id="btnScanQrCheckIn"><i class="bi bi-camera me-1"></i>Quét mã QR</button>
+                  </div>
+                  <div id="qrScannerWrap" class="d-none mb-3"><div id="qrScanner" style="max-width:320px;margin:0 auto"></div></div>
+                ` : `
+                  <p class="text-muted">Admin chưa mở hiển thị QR. Bạn có thể gửi ảnh minh chứng bên dưới.</p>
+                `}
+                <hr>
+                <button class="btn btn-warning" id="btnManualCheckIn"><i class="bi bi-image me-1"></i>Đã tham gia — gửi ảnh minh chứng</button>
+                <input type="file" id="proofImageInput" accept="image/*" class="d-none">
+              </div>
+            </div>
+          ` : ''}
+
           <div class="mt-4 d-flex gap-2 flex-wrap">
             ${status !== 'completed' && Auth.isMember() ? `
               <button class="btn btn-primary" id="btnJoin"><i class="bi bi-person-plus me-2"></i>Tham gia</button>
@@ -118,6 +156,66 @@ Pages.activityDetail = async function(container, id) {
     try {
       await API.joinActivity(id);
       Utils.showToast('Đã đăng ký tham gia hoạt động!', 'success');
+      Pages.activityDetail(container, id);
     } catch (err) { /* handled */ }
+  });
+
+  if (showQr && checkInInfo?.qrPayload) {
+    Utils.renderQrCode(document.getElementById('memberActivityQr'), checkInInfo.qrPayload, 180);
+  }
+
+  document.getElementById('btnManualCheckIn')?.addEventListener('click', () => {
+    document.getElementById('proofImageInput')?.click();
+  });
+
+  document.getElementById('proofImageInput')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      Utils.showToast('Ảnh không quá 5MB', 'danger');
+      return;
+    }
+    try {
+      const base64 = await Utils.fileToBase64(file);
+      const uploaded = await API.uploadAttendanceProof(base64, file.name, id);
+      await API.memberCheckIn(id, { method: 'manual', proofBase64: base64, filename: file.name, proofImage: uploaded.url });
+      Utils.showToast('Điểm danh thành công!', 'success');
+      Pages.activityDetail(container, id);
+    } catch (err) { /* handled */ }
+    e.target.value = '';
+  });
+
+  let html5Scanner = null;
+  document.getElementById('btnScanQrCheckIn')?.addEventListener('click', async () => {
+    const wrap = document.getElementById('qrScannerWrap');
+    if (!wrap || typeof Html5Qrcode === 'undefined') {
+      Utils.showToast('Trình quét QR chưa sẵn sàng', 'warning');
+      return;
+    }
+    wrap.classList.remove('d-none');
+    if (html5Scanner) return;
+    html5Scanner = new Html5Qrcode('qrScanner');
+    try {
+      await html5Scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        async (decoded) => {
+          const parsed = Utils.parseCheckInQrPayload(decoded);
+          if (!parsed || parsed.activityId !== id) {
+            Utils.showToast('Mã QR không đúng hoạt động này', 'danger');
+            return;
+          }
+          await html5Scanner.stop();
+          html5Scanner = null;
+          wrap.classList.add('d-none');
+          await API.memberCheckIn(id, { method: 'qr', checkInCode: parsed.checkInCode, qrPayload: decoded });
+          Utils.showToast('Điểm danh thành công!', 'success');
+          Pages.activityDetail(container, id);
+        },
+        () => {}
+      );
+    } catch {
+      Utils.showToast('Không mở được camera. Hãy dùng ảnh minh chứng.', 'warning');
+    }
   });
 };
